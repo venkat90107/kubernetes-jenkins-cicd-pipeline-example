@@ -1,48 +1,83 @@
+# ReplicationController for the HelloWorld application
 apiVersion: v1
-kind: Service
+kind: ReplicationController
 metadata:
   name: helloworld
-  namespace: {{NAMESPACE}}
-  labels:
-    app: helloworld
-spec:
-  ports:
-  - name: http
-    port: 9094
-    targetPort: 9094
-  selector:
-    app: helloworld
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: helloworld
-  namespace: {{NAMESPACE}}
+  namespace: {{NAMESPACE}} # Replace {{NAMESPACE}} with the actual namespace or remove it
   labels:
     app: helloworld
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: helloworld
   template:
     metadata:
       labels:
         app: helloworld
-        version: v1
     spec:
       containers:
-      - name: helloworld
+      - image: dockerhandson/spring-boot-mongo
+        name: helloworld
         ports:
-        - containerPort: 9094
-        image: {{PULL_IMAGE}}
-        imagePullPolicy: IfNotPresent
-        resources:
-          limits:
-            cpu: 200m
-            memory: 256Mi
-          requests:
-            cpu: 50m
-            memory: 64Mi
-      imagePullSecrets:
-      - name: {{PULL_SECRET}}
+        - name: helloworld
+          containerPort: 8080
+
+---
+# NodePort Service for HelloWorld application
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld
+  labels:
+    app: helloworld
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: helloworld
+
+---
+# ReplicationController for MongoDB
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: mongo-controller
+  labels:
+    app: mongo
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+      - image: mongo
+        name: mongo
+        ports:
+        - name: mongo
+          containerPort: 27017
+          hostPort: 27017
+        volumeMounts:
+        - name: mongo-persistent-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-persistent-storage
+        hostPath:
+          path: /tmp/dbbackup
+
+---
+# ClusterIP Service for MongoDB
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  labels:
+    app: mongo
+spec:
+  type: ClusterIP
+  ports:
+  - port: 27017
+    targetPort: 27017
+  selector:
+    app: mongo
